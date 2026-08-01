@@ -84,14 +84,6 @@ h1{
 }
 p.lead{ color:var(--muted); font-size:14.5px; line-height:1.6; margin:0 0 26px 0; }
 
-label{ display:block; font-family:var(--mono); font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px; }
-input[type=text]{
-  width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
-  font-family:var(--mono); font-size:16px; padding:14px 16px; border-radius:8px; outline:none;
-  transition:border-color .2s;
-}
-input[type=text]:focus{ border-color:var(--blue); }
-
 .btn{
   appearance:none; border:none; cursor:pointer;
   font-family:var(--sans); font-weight:700; font-size:14.5px;
@@ -104,6 +96,11 @@ input[type=text]:focus{ border-color:var(--blue); }
 .btn:active{ transform:translateY(0); }
 .btn:disabled{ opacity:.4; cursor:not-allowed; transform:none; }
 .btn.secondary{ background:transparent; color:var(--text); border:1px solid var(--line); }
+.btn.google{
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  background:#fff; color:#1f1f1f;
+}
+.btn.google svg{ width:18px; height:18px; }
 
 .pcb{
   font-family:var(--mono); font-size:12px; color:var(--muted);
@@ -112,7 +109,7 @@ input[type=text]:focus{ border-color:var(--blue); }
   display:grid; grid-template-columns:1fr 1fr; gap:8px 18px;
 }
 .pcb div span.k{ display:block; color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.08em; }
-.pcb div span.v{ display:block; color:var(--text); font-size:13px; margin-top:2px; }
+.pcb div span.v{ display:block; color:var(--text); font-size:13px; margin-top:2px; word-break:break-word; }
 
 .progresswrap{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; font-family:var(--mono); font-size:12px; color:var(--muted); }
 .progressbar{ height:4px; background:var(--panel-2); border-radius:4px; overflow:hidden; margin-bottom:22px; }
@@ -129,9 +126,9 @@ input[type=text]:focus{ border-color:var(--blue); }
 .timerbox.critical{ color:var(--red); border-color:rgba(255,107,107,0.5); animation:pulse .8s ease-in-out infinite; }
 
 .section-tag{ font-family:var(--mono); font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; margin-bottom:8px; }
-.qtext{ font-size:18px; font-weight:600; line-height:1.45; margin:0 0 22px 0; }
+.qtext{ font-size:18px; font-weight:600; line-height:1.45; margin:0 0 22px 0; user-select:none; }
 
-.options{ display:flex; flex-direction:column; gap:10px; margin-bottom:24px; }
+.options{ display:flex; flex-direction:column; gap:10px; margin-bottom:24px; user-select:none; }
 .opt{
   text-align:left; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
   border-radius:8px; padding:14px 16px; cursor:pointer; font-family:var(--sans); font-size:14.5px;
@@ -152,6 +149,7 @@ td{ padding:10px; border-bottom:1px solid var(--line); }
 tr.me{ background:rgba(110,168,254,0.08); }
 tr.top1 .rank{ color:var(--amber); }
 .rank{ font-weight:700; }
+.flag{ color:var(--red); font-size:11px; }
 .footer-note{ font-size:12px; color:var(--muted); margin-top:22px; text-align:center; font-family:var(--mono); }
 .spin{ display:inline-block; width:14px; height:14px; border:2px solid var(--line); border-top-color:var(--amber); border-radius:50%; animation:spin .7s linear infinite; vertical-align:-2px; margin-right:8px; }
 @keyframes spin{ to{ transform:rotate(360deg); } }
@@ -162,6 +160,11 @@ tr.top1 .rank{ color:var(--amber); }
 }
 .myresult .big{ font-family:var(--mono); font-weight:700; font-size:28px; color:var(--amber); }
 .myresult .lbl{ font-family:var(--mono); font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+
+.errbox{
+  background:rgba(255,107,107,0.08); border:1px solid rgba(255,107,107,0.35); color:var(--red);
+  border-radius:8px; padding:12px 14px; font-size:13px; margin-bottom:18px; font-family:var(--mono);
+}
 
 @media (max-width:480px){
   .body{ padding:22px; }
@@ -198,12 +201,12 @@ tr.top1 .rank{ color:var(--amber); }
 
 <script type="module">
 /* =========================================================================
-   Firebase setup (module SDK — must be loaded from a real https:// page,
-   e.g. your GitHub Pages URL. It will NOT work by double-clicking the
-   file locally — open the live GitHub Pages link instead.
+   Firebase setup — must be loaded from a real https:// page (your GitHub
+   Pages URL). Will NOT work by double-clicking the file locally.
    ========================================================================= */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, query, where, limit } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCxhSRTBFU6eBJcmgpm819UHdJ7Crfk8VU",
@@ -215,9 +218,11 @@ const firebaseConfig = {
 };
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
+const auth = getAuth(fbApp);
+const googleProvider = new GoogleAuthProvider();
 const resultsCollectionRef = collection(db, 'os_quiz_results');
 
-/* ---------------- Question bank (30 MCQs, from uploaded answer key) ---------------- */
+/* ---------------- Question bank (30 MCQs) ---------------- */
 const QUESTIONS = [
 {s:"OS Overview", q:"What is an Operating System?", o:["A software that manages hardware resources and provides services for application programs","A hardware component that speeds up the CPU","A programming language used to write applications","An application software used only for word processing"], c:0},
 {s:"OS Overview", q:"Which of the following is NOT a function of an operating system?", o:["Memory management","Process management","Compiling high-level language programs into machine code","File management"], c:2},
@@ -251,7 +256,7 @@ const QUESTIONS = [
 {s:"OS Structure & Operations", q:"Which of the following is a core responsibility of OS 'operations' during runtime?", o:["Handling process scheduling, memory management, and I/O management","Manufacturing computer hardware components","Designing website layouts","Managing social media accounts"], c:0},
 ];
 
-const TIME_PER_Q = 15; // seconds
+const TIME_PER_Q = 90; // seconds (1.5 minutes)
 const TOTAL_Q = QUESTIONS.length;
 
 /* ---------------- helpers ---------------- */
@@ -267,14 +272,17 @@ function fmtTime(s){
   const m = Math.floor(s/60), sec = s%60;
   return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
 }
-function safeKey(str){
-  return str.toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40);
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
 }
 
 /* ---------------- state ---------------- */
 let state = {
-  screen: 'register',
+  screen: 'register', // register, alreadyDone, ready, quiz, results
   alias: '',
+  email: '',
   qOrder: [],
   optOrders: [],
   current: 0,
@@ -289,20 +297,24 @@ let state = {
   leaderboard: [],
   saving: false,
   loadingBoard: true,
+  authBusy: false,
+  authError: '',
+  tabSwitchCount: 0,
+  myDocId: null,
+  priorResult: null,
 };
 
 const app = document.getElementById('app');
 
 function dotClass(){
-  if(state.screen==='register') return 'on-register';
+  if(state.screen==='register' || state.screen==='alreadyDone') return 'on-register';
   if(state.screen==='ready') return 'on-ready';
   if(state.screen==='quiz') return 'on-running';
   return 'on-done';
 }
 function badgeText(){
-  return {register:'idle', ready:'ready', quiz:'running', results:'terminated'}[state.screen];
+  return {register:'idle', alreadyDone:'locked', ready:'ready', quiz:'running', results:'terminated'}[state.screen];
 }
-
 function chrome(innerHtml, titleExtra){
   return `
     <div class="window">
@@ -317,67 +329,114 @@ function chrome(innerHtml, titleExtra){
 
 function render(){
   if(state.screen==='register') renderRegister();
+  else if(state.screen==='alreadyDone') renderAlreadyDone();
   else if(state.screen==='ready') renderReady();
   else if(state.screen==='quiz') renderQuiz();
   else if(state.screen==='results') renderResults();
   checkFullscreenState();
 }
 
+const googleIcon = `<svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.6 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.5 0 10.4-1.9 14.3-5.1l-6.6-5.6C29.7 34.9 27 36 24 36c-5.3 0-9.7-3.4-11.3-8.1l-6.6 5.1C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.3-4.1 5.7l6.6 5.6C41.4 36 44 30.5 44 24c0-1.3-.1-2.7-.4-3.5z"/></svg>`;
+
 function renderRegister(){
   app.innerHTML = chrome(`
     <div class="eyebrow">Process Creation</div>
     <h1>Enter the OS Quiz</h1>
-    <p class="lead">30 questions on operating systems fundamentals. Each question runs on a 90-second burst — answer before it expires or it's marked unanswered. Options are shuffled per participant.</p>
-    <label for="aliasInput">Alias (this is how you'll appear on the leaderboard)</label>
-    <input type="text" id="aliasInput" placeholder="e.g. kernel_ninja" maxlength="24" autocomplete="off">
-    <div style="height:16px"></div>
-    <button class="btn" id="startBtn">Register &amp; Continue</button>
+    <p class="lead">30 questions, ${TIME_PER_Q}s each. Sign in with your Google account to begin — each account can take this quiz once. Options are shuffled per participant.</p>
+    ${state.authError ? `<div class="errbox">${escapeHtml(state.authError)}</div>` : ''}
+    <button class="btn google" id="googleBtn" ${state.authBusy ? 'disabled' : ''}>
+      ${googleIcon} ${state.authBusy ? 'Signing in…' : 'Sign in with Google'}
+    </button>
     <div class="pcb">
       <div><span class="k">Questions</span><span class="v">${TOTAL_Q}</span></div>
       <div><span class="k">Time / question</span><span class="v">${TIME_PER_Q}s</span></div>
       <div><span class="k">Total runtime</span><span class="v">${Math.round(TOTAL_Q*TIME_PER_Q/60)} min</span></div>
-      <div><span class="k">Leaderboard</span><span class="v">Top 10</span></div>
+      <div><span class="k">Attempts allowed</span><span class="v">1 per Google account</span></div>
     </div>
   `);
-  const input = document.getElementById('aliasInput');
-  const btn = document.getElementById('startBtn');
-  const submit = () => {
-    const val = input.value.trim();
-    if(!val){ input.focus(); input.style.borderColor = 'var(--red)'; return; }
-    state.alias = val;
-    state.qOrder = shuffle([...Array(TOTAL_Q).keys()]);
-    state.optOrders = state.qOrder.map(qi => shuffle([...Array(QUESTIONS[qi].o.length).keys()]));
-    state.answers = new Array(TOTAL_Q).fill(null);
-    state.timeSpent = new Array(TOTAL_Q).fill(0);
-    state.current = 0;
-    state.screen = 'ready';
+  document.getElementById('googleBtn').onclick = doGoogleSignIn;
+}
+
+async function doGoogleSignIn(){
+  state.authBusy = true;
+  state.authError = '';
+  render();
+  try{
+    const result = await signInWithPopup(auth, googleProvider);
+    const user = result.user;
+    state.email = user.email;
+    state.alias = user.displayName || user.email.split('@')[0];
+    await checkExistingAttempt();
+  }catch(e){
+    console.error('Sign-in failed', e);
+    state.authError = 'Sign-in failed or was cancelled. Please try again.';
+    state.authBusy = false;
     render();
-  };
-  btn.onclick = submit;
-  input.onkeydown = (e) => { if(e.key==='Enter') submit(); };
-  input.focus();
+  }
+}
+
+async function checkExistingAttempt(){
+  try{
+    const q = query(resultsCollectionRef, where('email', '==', state.email), limit(1));
+    const snap = await getDocs(q);
+    if(!snap.empty){
+      const doc0 = snap.docs[0];
+      state.priorResult = Object.assign({ _id: doc0.id }, doc0.data());
+      state.authBusy = false;
+      state.screen = 'alreadyDone';
+      await loadLeaderboard();
+      return;
+    }
+  }catch(e){
+    console.error('Attempt check failed', e);
+  }
+  state.authBusy = false;
+  state.screen = 'ready';
+  render();
+}
+
+function renderAlreadyDone(){
+  const r = state.priorResult;
+  app.innerHTML = chrome(`
+    <div class="eyebrow">State: Locked</div>
+    <h1>You've already taken this quiz</h1>
+    <p class="lead">Each Google account gets one attempt. Here's your recorded result, ${escapeHtml(state.alias)}.</p>
+    <div class="myresult">
+      <div>
+        <div class="lbl">Your Score</div>
+        <div class="big">${r ? r.score : '—'} / ${TOTAL_Q}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="lbl">Total Time</div>
+        <div class="big" style="font-size:20px;">${r ? fmtTime(Math.round(r.totalTimeMs/1000)) : '—'}</div>
+      </div>
+    </div>
+    <div class="section-tag">Leaderboard — Top 10</div>
+    ${state.loadingBoard ? `<p class="footer-note"><span class="spin"></span>Loading leaderboard…</p>` : renderLeaderboardTable(state.leaderboard.slice(0,10))}
+  `, 'locked');
 }
 
 function renderReady(){
   app.innerHTML = chrome(`
     <div class="eyebrow">State: New → Ready</div>
     <h1>You're up, ${escapeHtml(state.alias)}</h1>
-    <p class="lead">Once you click start, the clock begins immediately on question 1. No pausing, no going back, and answers won't be revealed until every question is done. Good luck.</p>
+    <p class="lead">Once you click start: fullscreen activates, the clock begins on question 1, and copy/paste + right-click are disabled. No pausing, no going back, no answers revealed until the end.</p>
     <button class="btn" id="beginBtn">Start Quiz</button>
-    <button class="btn secondary" id="backBtn" style="margin-top:10px;">Change alias</button>
     <div class="pcb">
-      <div><span class="k">Alias / Process Name</span><span class="v">${escapeHtml(state.alias)}</span></div>
+      <div><span class="k">Signed in as</span><span class="v">${escapeHtml(state.email)}</span></div>
       <div><span class="k">Priority Queue</span><span class="v">${TOTAL_Q} jobs loaded</span></div>
     </div>
   `, 'registration');
   document.getElementById('beginBtn').onclick = () => {
+    state.qOrder = shuffle([...Array(TOTAL_Q).keys()]);
+    state.optOrders = state.qOrder.map(qi => shuffle([...Array(QUESTIONS[qi].o.length).keys()]));
+    state.answers = new Array(TOTAL_Q).fill(null);
+    state.timeSpent = new Array(TOTAL_Q).fill(0);
+    state.current = 0;
+    state.tabSwitchCount = 0;
     requestFullscreenMode();
     state.screen = 'quiz';
     startQuestionTimer();
-    render();
-  };
-  document.getElementById('backBtn').onclick = () => {
-    state.screen = 'register';
     render();
   };
 }
@@ -389,7 +448,7 @@ function startQuestionTimer(){
   state.timerId = setInterval(() => {
     state.timeLeft -= 1;
     if(state.timeLeft <= 0){
-      advanceQuestion(null);
+      advanceQuestion();
     } else {
       updateTimerDisplay();
     }
@@ -406,10 +465,8 @@ function updateTimerDisplay(){
 }
 
 function selectOption(displayIdx){
-  const qi = state.qOrder[state.current];
   const originalIdx = state.optOrders[state.current][displayIdx];
   state.answers[state.current] = originalIdx;
-  // re-render options highlight only
   document.querySelectorAll('.opt').forEach((el,i) => {
     el.classList.toggle('selected', i===displayIdx);
   });
@@ -462,7 +519,6 @@ function renderQuiz(){
 }
 
 async function finishQuiz(){
-  // score
   let score = 0;
   let totalTimeMs = 0;
   for(let i=0;i<TOTAL_Q;i++){
@@ -479,8 +535,10 @@ async function finishQuiz(){
 
   const record = {
     alias: state.alias,
+    email: state.email,
     score: state.score,
     totalTimeMs: state.totalTimeMs,
+    tabSwitches: state.tabSwitchCount,
     submittedAt: Date.now()
   };
   try{
@@ -502,11 +560,9 @@ async function loadLeaderboard(){
     snap.forEach(doc => results.push(Object.assign({ _id: doc.id }, doc.data())));
     results.sort((a,b) => b.score - a.score || a.totalTimeMs - b.totalTimeMs);
     state.leaderboard = results;
-    // compute my rank using the doc id we just created
     let myIdx = results.findIndex(r => r._id === state.myDocId);
     if(myIdx === -1){
-      // fallback: first exact score+time match
-      myIdx = results.findIndex(r => r.alias===state.alias && r.score===state.score && r.totalTimeMs===state.totalTimeMs);
+      myIdx = results.findIndex(r => r.email===state.email);
     }
     state.rank = myIdx >= 0 ? myIdx+1 : null;
   }catch(e){
@@ -556,39 +612,25 @@ function renderLeaderboardTable(rows){
   }
   return `
     <table>
-      <thead><tr><th>Rank</th><th>Alias</th><th>Score</th><th>Time</th></tr></thead>
+      <thead><tr><th>Rank</th><th>Alias</th><th>Score</th><th>Time</th><th>Flags</th></tr></thead>
       <tbody>
         ${rows.map((r,i) => `
-          <tr class="${r.alias===state.alias && (i+1)===state.rank ? 'me' : ''} ${i===0?'top1':''}">
+          <tr class="${r.email===state.email ? 'me' : ''} ${i===0?'top1':''}">
             <td class="rank">${i===0?'🥇':i===1?'🥈':i===2?'🥉':('#'+(i+1))}</td>
             <td>${escapeHtml(r.alias)}</td>
             <td>${r.score}/${TOTAL_Q}</td>
             <td>${fmtTime(Math.round(r.totalTimeMs/1000))}</td>
+            <td>${r.tabSwitches ? `<span class="flag">⚠ ${r.tabSwitches}</span>` : '—'}</td>
           </tr>`).join('')}
       </tbody>
     </table>`;
 }
 
-function escapeHtml(str){
-  const d = document.createElement('div');
-  d.textContent = str;
-  return d.innerHTML;
-}
-
-/* patch finishQuiz to record submission timestamp for rank matching */
-const _origFinish = finishQuiz;
-finishQuiz = async function(){
-  state.myRecordTime = Date.now();
-  await _origFinish();
-};
-
-/* ---------------- fullscreen enforcement (quiz screen only) ---------------- */
+/* ---------------- fullscreen enforcement ---------------- */
 function requestFullscreenMode(){
   const el = document.documentElement;
   const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
-  if(req){
-    req.call(el).catch(() => { /* user or browser denied — overlay will prompt again */ });
-  }
+  if(req){ req.call(el).catch(() => {}); }
 }
 function isFullscreenActive(){
   return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
@@ -596,22 +638,34 @@ function isFullscreenActive(){
 function checkFullscreenState(){
   const warn = document.getElementById('fsWarning');
   if(!warn) return;
-  if(state.screen === 'quiz' && !isFullscreenActive()){
-    warn.style.display = 'flex';
-  } else {
-    warn.style.display = 'none';
-  }
+  warn.style.display = (state.screen === 'quiz' && !isFullscreenActive()) ? 'flex' : 'none';
 }
 ['fullscreenchange','webkitfullscreenchange','mozfullscreenchange','MSFullscreenChange'].forEach(evt => {
   document.addEventListener(evt, checkFullscreenState);
 });
-const fsResumeBtn = document.getElementById('fsResumeBtn');
-if(fsResumeBtn){
-  fsResumeBtn.onclick = () => requestFullscreenMode();
-}
+document.getElementById('fsResumeBtn').onclick = () => requestFullscreenMode();
+
+/* ---------------- anti-cheat: block copy / right-click / selection during quiz ---------------- */
+document.addEventListener('contextmenu', (e) => { if(state.screen==='quiz') e.preventDefault(); });
+document.addEventListener('copy', (e) => { if(state.screen==='quiz') e.preventDefault(); });
+document.addEventListener('cut', (e) => { if(state.screen==='quiz') e.preventDefault(); });
+document.addEventListener('paste', (e) => { if(state.screen==='quiz') e.preventDefault(); });
+document.addEventListener('selectstart', (e) => { if(state.screen==='quiz') e.preventDefault(); });
+
+/* ---------------- anti-cheat: flag tab switches / minimizing during quiz ---------------- */
+document.addEventListener('visibilitychange', () => {
+  if(state.screen==='quiz' && document.hidden){
+    state.tabSwitchCount += 1;
+  }
+});
+window.addEventListener('blur', () => {
+  if(state.screen==='quiz'){
+    // debounce: visibilitychange usually already counts real tab switches;
+    // this catches alt-tab to another app on some browsers.
+  }
+});
 
 render();
-checkFullscreenState();
 </script>
 </body>
 </html>
