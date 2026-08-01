@@ -44,12 +44,30 @@ body{
 #app{ position:relative; z-index:1; width:100%; max-width:640px; }
 
 .window{
+  position:relative;
   background:var(--panel);
   border:1px solid var(--line);
   border-radius:10px;
   overflow:hidden;
   box-shadow: 0 30px 80px -20px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.02);
 }
+.watermark{
+  position:absolute; inset:0; z-index:6; pointer-events:none; overflow:hidden;
+  display:flex; flex-wrap:wrap; align-content:space-around; justify-content:space-around;
+  opacity:0.09;
+}
+.watermark span{
+  font-family:var(--mono); font-size:10.5px; color:#ffffff; white-space:nowrap;
+  transform:rotate(-25deg); margin:20px; user-select:none;
+}
+.integrity-box{
+  background:var(--panel-2); border:1px solid var(--line); border-radius:8px;
+  padding:16px; margin:20px 0; display:flex; gap:12px; align-items:flex-start;
+}
+.integrity-box input[type=checkbox]{
+  margin-top:3px; width:16px; height:16px; flex-shrink:0; accent-color:var(--amber);
+}
+.integrity-box label{ font-family:var(--sans); font-size:13.5px; color:var(--text); line-height:1.55; text-transform:none; letter-spacing:normal; cursor:pointer; }
 .titlebar{
   display:flex; align-items:center; gap:10px;
   padding:11px 16px;
@@ -256,7 +274,7 @@ const QUESTIONS = [
 {s:"OS Structure & Operations", q:"Which of the following is a core responsibility of OS 'operations' during runtime?", o:["Handling process scheduling, memory management, and I/O management","Manufacturing computer hardware components","Designing website layouts","Managing social media accounts"], c:0},
 ];
 
-const TIME_PER_Q = 30; // seconds (1.5 minutes)
+const TIME_PER_Q = 30; // seconds
 const TOTAL_Q = QUESTIONS.length;
 
 /* ---------------- helpers ---------------- */
@@ -421,13 +439,21 @@ function renderReady(){
     <div class="eyebrow">State: New → Ready</div>
     <h1>You're up, ${escapeHtml(state.alias)}</h1>
     <p class="lead">Once you click start: fullscreen activates, the clock begins on question 1, and copy/paste + right-click are disabled. No pausing, no going back, no answers revealed until the end.</p>
-    <button class="btn" id="beginBtn">Start Quiz</button>
+    <div class="integrity-box">
+      <input type="checkbox" id="integrityCheck">
+      <label for="integrityCheck">I confirm I will not use Circle to Search, Gemini, ChatGPT, another device, or any other outside help during this quiz. My name, email, and a live timestamp will be visibly watermarked on every question, and this session is monitored for review.</label>
+    </div>
+    <button class="btn" id="beginBtn" disabled>Start Quiz</button>
     <div class="pcb">
       <div><span class="k">Signed in as</span><span class="v">${escapeHtml(state.email)}</span></div>
       <div><span class="k">Priority Queue</span><span class="v">${TOTAL_Q} jobs loaded</span></div>
     </div>
   `, 'registration');
-  document.getElementById('beginBtn').onclick = () => {
+  const beginBtn = document.getElementById('beginBtn');
+  document.getElementById('integrityCheck').onchange = (e) => {
+    beginBtn.disabled = !e.target.checked;
+  };
+  beginBtn.onclick = () => {
     state.qOrder = shuffle([...Array(TOTAL_Q).keys()]);
     state.optOrders = state.qOrder.map(qi => shuffle([...Array(QUESTIONS[qi].o.length).keys()]));
     state.answers = new Array(TOTAL_Q).fill(null);
@@ -451,8 +477,19 @@ function startQuestionTimer(){
       advanceQuestion();
     } else {
       updateTimerDisplay();
+      updateWatermark();
     }
   }, 1000);
+}
+
+function watermarkSpans(){
+  const stamp = new Date().toLocaleTimeString();
+  const line = `${state.alias} • ${state.email} • ${stamp}`;
+  return Array.from({length: 18}).map(() => `<span>${escapeHtml(line)}</span>`).join('');
+}
+function updateWatermark(){
+  const wm = document.getElementById('watermarkOverlay');
+  if(wm) wm.innerHTML = watermarkSpans();
 }
 
 function updateTimerDisplay(){
@@ -493,6 +530,7 @@ function renderQuiz(){
     state.optOrders[state.current].indexOf(state.answers[state.current]);
 
   app.innerHTML = chrome(`
+    <div id="watermarkOverlay" class="watermark">${watermarkSpans()}</div>
     <div class="progresswrap">
       <span>QUESTION ${state.current+1} / ${TOTAL_Q}</span>
       <span>${escapeHtml(state.alias)}</span>
