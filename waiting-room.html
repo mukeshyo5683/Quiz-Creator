@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>quiz.join — waiting room</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body{ display:flex; align-items:center; justify-content:center; padding:24px; }
+  .window{ max-width: 560px; margin:0; }
+  .content{ padding: 34px 34px 30px; text-align:center; }
+  .you-badge{ font-family: var(--mono); font-size:12px; color:var(--muted); margin-bottom: 6px; }
+  .room-code{ font-family: var(--mono); font-size:38px; letter-spacing:10px; color: var(--teal); margin: 6px 0 22px; }
+  .pulse-wrap{ display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom: 26px; }
+  .pulse-dot{ width:9px; height:9px; border-radius:50%; background: var(--amber); animation: pulse 1.2s ease-in-out infinite; }
+  .pulse-text{ font-family: var(--mono); font-size:13.5px; color: var(--muted); }
+  @keyframes pulse{ 0%,100%{ opacity:1; transform:scale(1);} 50%{ opacity:.35; transform:scale(.8);} }
+
+  .participant-strip{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom: 24px; }
+  .chip{ font-family: var(--mono); font-size:11.5px; padding:6px 11px; border:1px solid var(--border); border-radius:20px; color: var(--muted); background: var(--panel-3); }
+  .chip.you{ color: var(--amber); border-color: var(--amber-dim); }
+
+  .hint{ font-family: var(--mono); font-size:11.5px; color:var(--muted); border:1px dashed var(--border); border-radius:6px; padding:10px 12px; }
+</style>
+</head>
+<body>
+
+<div class="window">
+  <div class="titlebar">
+    <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+    <div class="path"><a href="index.html">~/quiz-app</a> / waiting-room.session</div>
+    <div class="badge teal">participant</div>
+  </div>
+
+  <div class="content">
+    <div class="you-badge">joined as <b id="you-name" style="color:var(--text)">—</b></div>
+    <div class="room-code" id="room-code-display">------</div>
+
+    <div class="pulse-wrap"><span class="pulse-dot"></span><span class="pulse-text" id="wait-text">waiting for the host to start the quiz...</span></div>
+
+    <div class="participant-strip" id="participant-strip"></div>
+
+    <div class="hint">Keep this tab open — the quiz will start automatically the moment your host launches it.</div>
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script>
+  const name = QuizApp.getParam('name', 'Guest');
+  const code = QuizApp.getParam('code', '------');
+  const anticopy = QuizApp.getParam('anticopy', '1');
+
+  document.getElementById('you-name').textContent = name;
+  document.getElementById('room-code-display').textContent = code;
+
+  const sampleNames = ['Aditi','Rohan','Priya','Karthik','Sneha','Arjun'];
+  const strip = document.getElementById('participant-strip');
+  strip.innerHTML = `<span class="chip you">${name} (you)</span>`;
+
+  let joined = 0;
+  const joinInterval = setInterval(() => {
+    if(joined >= sampleNames.length){ clearInterval(joinInterval); return; }
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.textContent = sampleNames[joined];
+    strip.appendChild(chip);
+    joined++;
+  }, 900);
+
+  // simulate the host launching the quiz after a short wait, then move to play-quiz.html
+  const waitMs = 5000 + Math.random() * 3000;
+  setTimeout(() => {
+    document.getElementById('wait-text').textContent = 'host started the quiz — joining now';
+    setTimeout(() => {
+      window.location.href = QuizApp.buildUrl('play-quiz.html', { name, code, anticopy });
+    }, 900);
+  }, waitMs);
+</script>
+</body>
+</html>

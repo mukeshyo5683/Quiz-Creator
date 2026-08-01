@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>quiz.create — host workspace</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .layout{ display:grid; grid-template-columns: 300px 1fr; min-height: 640px; }
+  .sidebar{ background: var(--panel-3); border-right: 1px solid var(--border); padding: 26px 22px; display:flex; flex-direction:column; gap:26px; }
+  .sidebar-title{ font-family: var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:8px; }
+  .sidebar-title::before{ content:""; width:6px; height:6px; border-radius:50%; background:var(--amber); }
+  .steps{ display:flex; flex-direction:column; gap:4px; }
+  .step{ display:flex; align-items:flex-start; gap:12px; font-family: var(--mono); font-size:13px; color:var(--muted); padding:10px 0 10px 14px; border-left:2px solid var(--border); margin-left:5px; position:relative; }
+  .step .num{ position:absolute; left:-9px; top:8px; width:16px; height:16px; border-radius:50%; background:var(--panel-3); border:2px solid var(--border); font-size:9px; display:flex; align-items:center; justify-content:center; color:var(--muted); }
+  .step.done{ color: var(--text); border-color: var(--green); }
+  .step.done .num{ background: var(--green); border-color: var(--green); color:#04140b; }
+  .step.current{ color: var(--amber); border-color: var(--amber); }
+  .step.current .num{ background: var(--amber); border-color: var(--amber); color:#241a08; }
+  .step small{ display:block; color:var(--muted); font-size:11px; margin-top:2px; }
+  .feed{ flex:1; overflow:hidden; }
+
+  .workspace{ padding: 30px 34px 36px; }
+  #question-list{ display:flex; flex-direction:column; gap:14px; margin:18px 0; }
+  .q-card{ background: var(--panel-3); border:1px solid var(--border); border-radius:7px; padding:16px 18px; }
+  .q-card-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .q-card-head .q-label{ font-family: var(--mono); font-size:12px; color:var(--amber); }
+  .q-remove{ background:none; border:none; color:var(--muted); cursor:pointer; font-family:var(--mono); font-size:12px; }
+  .q-remove:hover{ color:var(--red); }
+  .q-text-input{ margin-bottom:12px; }
+  .options-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .option-row{ display:flex; align-items:center; gap:8px; }
+  .option-row input[type="radio"]{ accent-color:var(--green); width:14px; height:14px; flex-shrink:0; }
+  .option-row input[type="text"]{ font-size:12.5px; padding:8px 10px; }
+  .action-row{ display:flex; gap:12px; align-items:center; margin-top:6px; flex-wrap:wrap; }
+
+  .room-result{ display:none; margin-top:18px; background: var(--panel-3); border:1px solid var(--teal-dim); border-radius:7px; padding:18px 20px; }
+  .room-result.show{ display:block; }
+  .room-result .rr-label{ font-family: var(--mono); font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+  .room-code{ font-family: var(--mono); font-size:30px; letter-spacing:8px; color:var(--teal); margin:6px 0 14px; }
+  .room-link-row{ display:flex; gap:10px; align-items:center; background: var(--panel); border:1px solid var(--border); border-radius:6px; padding:8px 10px; }
+  .room-link-row input{ border:none; background:transparent; padding:2px; font-size:12.5px; }
+  .copy-btn{ background: var(--teal); color:#06282a; border:none; border-radius:5px; padding:7px 12px; font-family:var(--mono); font-size:11.5px; cursor:pointer; flex-shrink:0; }
+  .copy-btn:hover{ filter:brightness(1.08); }
+
+  @media (max-width: 900px){
+    .layout{ grid-template-columns: 1fr; }
+    .sidebar{ display:none; }
+    .options-grid{ grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="window">
+  <div class="titlebar">
+    <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+    <div class="path"><a href="index.html">~/quiz-app</a> / create-quiz.session</div>
+    <div class="badge">host mode</div>
+  </div>
+
+  <div class="layout">
+    <div class="sidebar">
+      <div>
+        <div class="sidebar-title">workflow</div>
+        <div class="steps" style="margin-top:14px;">
+          <div class="step current" id="step-1"><div class="num">1</div><div>Quiz details<small>Topic, difficulty, question count</small></div></div>
+          <div class="step" id="step-2"><div class="num">2</div><div>Questions<small>Generate or add manually</small></div></div>
+          <div class="step" id="step-3"><div class="num">3</div><div>Create room<small>Configure and launch</small></div></div>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; min-height:0; flex:1;">
+        <div class="sidebar-title">activity log</div>
+        <div class="feed" id="feed-lines" style="margin-top:12px;"></div>
+      </div>
+    </div>
+
+    <div class="workspace">
+      <div class="panel-card" id="panel-details">
+        <div class="panel-head">
+          <div><h2><span class="idx">01</span> Quiz details</h2><p>Set the topic and shape of your quiz.</p></div>
+        </div>
+        <div class="grid-2">
+          <div class="field"><label for="topic">topic <span style="color:var(--red)">*</span></label><input type="text" id="topic" placeholder="e.g. Operating Systems — Process Scheduling"></div>
+          <div class="field"><label for="difficulty">difficulty</label>
+            <select id="difficulty"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select>
+          </div>
+        </div>
+        <div class="grid-3">
+          <div class="field"><label for="qcount">number of questions</label><input type="number" id="qcount" value="5" min="1" max="30"></div>
+          <div class="field"><label for="qtype">question type</label>
+            <select id="qtype"><option value="mcq">Multiple choice</option><option value="truefalse">True / False</option></select>
+          </div>
+          <div class="field"><label for="timer">seconds per question</label><input type="number" id="timer" value="30" min="5" max="300"></div>
+        </div>
+        <div class="action-row">
+          <button class="btn btn-amber" id="generate-btn" type="button">generate_questions --from-topic</button>
+          <button class="btn btn-ghost" id="manual-btn" type="button">add manually instead</button>
+        </div>
+        <div class="status-line" id="details-status"></div>
+      </div>
+
+      <div class="panel-card locked" id="panel-questions">
+        <div class="panel-head">
+          <div><h2><span class="idx">02</span> Questions</h2><p>Review, edit, or add questions. Mark the correct option for each.</p></div>
+          <button class="btn btn-ghost" id="add-question-btn" type="button">+ add question</button>
+        </div>
+        <div id="question-list"></div>
+        <div class="empty-state" id="empty-state">No questions yet — generate from a topic or add one manually.</div>
+        <div class="action-row">
+          <button class="btn btn-amber" id="confirm-questions-btn" type="button" disabled>confirm_quiz --save</button>
+        </div>
+        <div class="status-line" id="questions-status"></div>
+      </div>
+
+      <div class="panel-card locked" id="panel-room">
+        <div class="panel-head">
+          <div><h2><span class="idx">03</span> Create room</h2><p>Configure how participants join and play.</p></div>
+        </div>
+
+        <div class="toggle-row">
+          <div class="t-label">Require room password<small>Participants must enter this to join</small></div>
+          <label class="switch"><input type="checkbox" id="pw-toggle"><span class="slider"></span></label>
+        </div>
+        <div class="field" id="pw-field" style="display:none; margin-top:12px;">
+          <label for="room-password">room password</label><input type="password" id="room-password" placeholder="set a password">
+        </div>
+
+        <div class="toggle-row">
+          <div class="t-label">Shuffle questions<small>Each participant sees a different order</small></div>
+          <label class="switch"><input type="checkbox" id="shuffle-toggle" checked><span class="slider"></span></label>
+        </div>
+
+        <div class="toggle-row">
+          <div class="t-label">Allow late join<small>Participants can join after quiz starts</small></div>
+          <label class="switch"><input type="checkbox" id="late-toggle"><span class="slider"></span></label>
+        </div>
+
+        <div class="toggle-row">
+          <div class="t-label">Force full-screen (anti-copying)<small>Locks participants into full-screen and blocks copy, right-click, and dev tools while they play</small></div>
+          <label class="switch"><input type="checkbox" id="anticopy-toggle" checked><span class="slider"></span></label>
+        </div>
+        <div class="lock-note show" id="anticopy-note">
+          When enabled, each <b>participant's</b> screen is locked into full-screen once they start answering — copy/cut/paste,
+          right-click, and dev-tools shortcuts are blocked, and exiting full-screen or switching tabs is logged as a
+          <b>violation</b> you'll see live on the host monitor.
+        </div>
+
+        <div class="field" style="margin-top:16px;"><label for="max-participants">max participants</label><input type="number" id="max-participants" value="50" min="1" max="500"></div>
+
+        <div class="action-row"><button class="btn btn-teal" id="create-room-btn" type="button">create_room --launch</button></div>
+
+        <div class="room-result" id="room-result">
+          <div class="rr-label">room code</div>
+          <div class="room-code" id="room-code">------</div>
+          <div class="room-link-row">
+            <input type="text" id="room-link" readonly value="">
+            <button class="copy-btn" id="copy-link-btn" type="button">copy</button>
+          </div>
+          <div class="action-row" style="margin-top:16px;">
+            <button class="btn btn-amber" id="start-quiz-btn" type="button">start_quiz --now</button>
+            <span class="status-line" id="room-status" style="margin:0;"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script>
+  let questions = [];
+  let qSeq = 0;
+  let roomCode = '';
+
+  const panelQuestions = document.getElementById('panel-questions');
+  const panelRoom = document.getElementById('panel-room');
+  const step1 = document.getElementById('step-1'), step2 = document.getElementById('step-2'), step3 = document.getElementById('step-3');
+
+  function setStep(n){
+    [step1, step2, step3].forEach((s, i) => {
+      s.classList.remove('current','done');
+      if(i < n-1) s.classList.add('done');
+      if(i === n-1) s.classList.add('current');
+    });
+  }
+  function log(html){
+    const feed = document.getElementById('feed-lines');
+    const div = document.createElement('div');
+    div.className = 'feed-line';
+    div.innerHTML = html;
+    feed.appendChild(div);
+  }
+  const hostEmail = QuizApp.getParam('host', 'host');
+  log(`<span class="prompt">$</span> quiz create <span class="comment">--host ${hostEmail}</span>`);
+  log('<span class="comment">// waiting for quiz details...</span>');
+
+  function escapeAttr(str){ return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
+
+  function renderQuestions(){
+    const list = document.getElementById('question-list');
+    const empty = document.getElementById('empty-state');
+    list.innerHTML = '';
+    empty.style.display = questions.length ? 'none' : 'block';
+    questions.forEach((q, idx) => {
+      const card = document.createElement('div');
+      card.className = 'q-card';
+      card.innerHTML = `
+        <div class="q-card-head"><span class="q-label">Q${idx + 1}</span><button class="q-remove" data-id="${q.id}" type="button">remove ✕</button></div>
+        <div class="q-text-input"><input type="text" placeholder="Question text" value="${escapeAttr(q.text)}" data-field="text" data-id="${q.id}"></div>
+        <div class="options-grid">
+          ${q.options.map((opt, oi) => `
+            <div class="option-row">
+              <input type="radio" name="correct-${q.id}" ${q.correct === oi ? 'checked' : ''} data-field="correct" data-id="${q.id}" data-opt="${oi}">
+              <input type="text" placeholder="Option ${oi + 1}" value="${escapeAttr(opt)}" data-field="option" data-id="${q.id}" data-opt="${oi}">
+            </div>`).join('')}
+        </div>`;
+      list.appendChild(card);
+    });
+    document.getElementById('confirm-questions-btn').disabled = questions.length === 0;
+  }
+
+  function addQuestion(text = '', options = ['', '', '', ''], correct = 0){
+    qSeq++;
+    questions.push({ id: qSeq, text, options: [...options], correct });
+    renderQuestions();
+  }
+
+  document.getElementById('question-list').addEventListener('input', (e) => {
+    const id = Number(e.target.dataset.id);
+    const q = questions.find(q => q.id === id);
+    if(!q) return;
+    if(e.target.dataset.field === 'text') q.text = e.target.value;
+    if(e.target.dataset.field === 'option') q.options[Number(e.target.dataset.opt)] = e.target.value;
+  });
+  document.getElementById('question-list').addEventListener('change', (e) => {
+    if(e.target.dataset.field === 'correct'){
+      const q = questions.find(q => q.id === Number(e.target.dataset.id));
+      if(q) q.correct = Number(e.target.dataset.opt);
+    }
+  });
+  document.getElementById('question-list').addEventListener('click', (e) => {
+    if(e.target.classList.contains('q-remove')){
+      questions = questions.filter(q => q.id !== Number(e.target.dataset.id));
+      renderQuestions();
+      log('<span class="comment">// question removed</span>');
+    }
+  });
+
+  function unlockQuestionsPanel(){
+    panelQuestions.classList.remove('locked');
+    setStep(2);
+    panelQuestions.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  document.getElementById('generate-btn').addEventListener('click', () => {
+    const topic = document.getElementById('topic').value.trim();
+    const status = document.getElementById('details-status');
+    if(!topic){ status.textContent = '✗ error: enter a topic first'; status.className = 'status-line err'; return; }
+    const count = Math.min(Math.max(Number(document.getElementById('qcount').value) || 5, 1), 30);
+    status.textContent = `> generating ${count} questions on "${topic}" ...`;
+    status.className = 'status-line';
+    log(`<span class="prompt">$</span> generate --topic "${topic}" --count ${count}`);
+    setTimeout(() => {
+      questions = []; qSeq = 0;
+      for(let i = 1; i <= count; i++) addQuestion(`Sample question ${i} about ${topic} — edit this text`, ['Option A','Option B','Option C','Option D'], 0);
+      status.textContent = `✓ generated ${count} draft questions — edit them below`;
+      status.className = 'status-line ok';
+      log(`<span class="ok">✓</span> ${count} questions drafted`);
+      unlockQuestionsPanel();
+    }, 800);
+  });
+
+  document.getElementById('manual-btn').addEventListener('click', () => {
+    const topic = document.getElementById('topic').value.trim();
+    const status = document.getElementById('details-status');
+    if(!topic){ status.textContent = '✗ error: enter a topic first'; status.className = 'status-line err'; return; }
+    status.textContent = '✓ topic set — add your questions below';
+    status.className = 'status-line ok';
+    log(`<span class="prompt">$</span> quiz set-topic "${topic}"`);
+    if(questions.length === 0) addQuestion();
+    unlockQuestionsPanel();
+  });
+
+  document.getElementById('add-question-btn').addEventListener('click', () => { addQuestion(); log('<span class="comment">// blank question added</span>'); });
+
+  document.getElementById('confirm-questions-btn').addEventListener('click', () => {
+    const status = document.getElementById('questions-status');
+    const incomplete = questions.some(q => !q.text.trim() || q.options.some(o => !o.trim()));
+    if(incomplete){ status.textContent = '✗ error: fill in all question text and options before saving'; status.className = 'status-line err'; return; }
+    status.textContent = `✓ ${questions.length} questions saved`;
+    status.className = 'status-line ok';
+    log(`<span class="ok">✓</span> quiz saved with ${questions.length} questions`);
+    panelRoom.classList.remove('locked');
+    setStep(3);
+    panelRoom.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  const pwToggle = document.getElementById('pw-toggle');
+  pwToggle.addEventListener('change', () => { document.getElementById('pw-field').style.display = pwToggle.checked ? 'block' : 'none'; });
+
+  document.getElementById('create-room-btn').addEventListener('click', () => {
+    const requiresPw = pwToggle.checked;
+    const pwVal = document.getElementById('room-password').value;
+    if(requiresPw && !pwVal){ alert('Set a room password, or turn off the password toggle.'); return; }
+    roomCode = QuizApp.generateRoomCode();
+    document.getElementById('room-code').textContent = roomCode;
+    document.getElementById('room-link').value = `${window.location.origin}${window.location.pathname.replace('create-quiz.html','index.html')}?role=participant&code=${roomCode}`;
+    document.getElementById('room-result').classList.add('show');
+    log(`<span class="prompt">$</span> quiz create-room <span class="comment">--code ${roomCode}</span>`);
+    log(`<span class="ok">✓</span> room ${roomCode} is live and waiting for participants`);
+    document.getElementById('room-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+
+  document.getElementById('copy-link-btn').addEventListener('click', () => {
+    const link = document.getElementById('room-link');
+    link.select();
+    document.execCommand('copy');
+    const btn = document.getElementById('copy-link-btn');
+    const original = btn.textContent;
+    btn.textContent = 'copied ✓';
+    setTimeout(() => btn.textContent = original, 1200);
+  });
+
+  document.getElementById('start-quiz-btn').addEventListener('click', () => {
+    const status = document.getElementById('room-status');
+    status.textContent = '✓ starting — opening host monitor...';
+    status.className = 'status-line ok';
+    log('<span class="ok">✓</span> quiz started — moving to live monitor');
+
+    const params = {
+      code: roomCode,
+      host: hostEmail,
+      timer: document.getElementById('timer').value,
+      shuffle: document.getElementById('shuffle-toggle').checked ? '1' : '0',
+      late: document.getElementById('late-toggle').checked ? '1' : '0',
+      anticopy: document.getElementById('anticopy-toggle').checked ? '1' : '0',
+      max: document.getElementById('max-participants').value,
+      quiz: QuizApp.encodeQuiz(questions)
+    };
+    setTimeout(() => { window.location.href = QuizApp.buildUrl('host-live.html', params); }, 500);
+  });
+</script>
+</body>
+</html>
