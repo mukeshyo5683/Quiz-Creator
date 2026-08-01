@@ -665,7 +665,13 @@ function renderLeaderboardTable(rows){
 }
 
 /* ---------------- fullscreen enforcement ---------------- */
+function fullscreenIsSupported(){
+  const el = document.documentElement;
+  return !!(el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen);
+}
+const FULLSCREEN_SUPPORTED = fullscreenIsSupported();
 function requestFullscreenMode(){
+  if(!FULLSCREEN_SUPPORTED) return;
   const el = document.documentElement;
   const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
   if(req){ req.call(el).catch(() => {}); }
@@ -676,6 +682,9 @@ function isFullscreenActive(){
 function checkFullscreenState(){
   const warn = document.getElementById('fsWarning');
   if(!warn) return;
+  // Devices without Fullscreen API support (notably iPhone Safari) can never
+  // satisfy this check — skip enforcement there instead of blocking them.
+  if(!FULLSCREEN_SUPPORTED){ warn.style.display = 'none'; return; }
   warn.style.display = (state.screen === 'quiz' && !isFullscreenActive()) ? 'flex' : 'none';
 }
 ['fullscreenchange','webkitfullscreenchange','mozfullscreenchange','MSFullscreenChange'].forEach(evt => {
