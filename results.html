@@ -34,57 +34,65 @@
   </div>
 
   <div class="content" id="content">
-    <!-- filled by script -->
+    <div class="empty-state">Loading results...</div>
   </div>
 </div>
 
 <script src="common.js"></script>
-<script>
+<script type="module">
+  import { getParticipantsOnce } from "./rooms.js";
+
   const role = QuizApp.getParam('role', 'participant');
   const code = QuizApp.getParam('code', '------');
   const content = document.getElementById('content');
 
-  if(role === 'host'){
-    document.getElementById('role-badge').textContent = 'host summary';
-    const boardRaw = QuizApp.getParam('board', '');
-    const board = boardRaw
-      ? boardRaw.split(',').map(pair => { const [name, score] = pair.split(':'); return { name, score: Number(score) || 0 }; })
-      : [];
+  async function render(){
+    if(role === 'host'){
+      document.getElementById('role-badge').textContent = 'host summary';
+      let board = [];
+      try{
+        board = await getParticipantsOnce(code);
+      }catch(err){
+        console.error(err);
+      }
 
-    content.innerHTML = `
-      <div class="headline">quiz complete — room ${code}</div>
-      <div class="big-score">${board.length}</div>
-      <div class="sub-score">participants finished</div>
-      <div class="leaderboard">
-        ${board.length ? board.map((p, i) => `
-          <div class="lb-row ${i === 0 ? 'gold' : ''}"><span><span class="rank">#${i+1}</span>${p.name}</span><span class="lb-score">${p.score} pts</span></div>
-        `).join('') : '<div class="empty-state">No participants finished this round.</div>'}
-      </div>
-      <div class="actions">
-        <a class="btn btn-amber" href="create-quiz.html">create_quiz --new</a>
-        <a class="btn btn-ghost" href="index.html">back_to_home</a>
-      </div>
-    `;
-  } else {
-    document.getElementById('role-badge').textContent = 'your result';
-    const name = QuizApp.getParam('name', 'Guest');
-    const score = Number(QuizApp.getParam('score', 0));
-    const total = Number(QuizApp.getParam('total', 100));
-    const pct = total > 0 ? Math.round((score/total)*100) : 0;
+      content.innerHTML = `
+        <div class="headline">quiz complete — room ${code}</div>
+        <div class="big-score">${board.length}</div>
+        <div class="sub-score">participants finished</div>
+        <div class="leaderboard">
+          ${board.length ? board.map((p, i) => `
+            <div class="lb-row ${i === 0 ? 'gold' : ''}"><span><span class="rank">#${i+1}</span>${p.name}</span><span class="lb-score">${p.score} pts</span></div>
+          `).join('') : '<div class="empty-state">No participants finished this round.</div>'}
+        </div>
+        <div class="actions">
+          <a class="btn btn-amber" href="create-quiz.html">create_quiz --new</a>
+          <a class="btn btn-ghost" href="index.html">back_to_home</a>
+        </div>
+      `;
+    } else {
+      document.getElementById('role-badge').textContent = 'your result';
+      const name = QuizApp.getParam('name', 'Guest');
+      const score = Number(QuizApp.getParam('score', 0));
+      const total = Number(QuizApp.getParam('total', 100));
+      const pct = total > 0 ? Math.round((score/total)*100) : 0;
 
-    content.innerHTML = `
-      <div class="headline">nice work, ${name}</div>
-      <div class="big-score">${score}</div>
-      <div class="sub-score">out of ${total} points · ${pct}% correct</div>
-      <div class="leaderboard">
-        <div class="lb-row gold"><span><span class="rank">#1</span>${name} (you)</span><span class="lb-score">${score} pts</span></div>
-      </div>
-      <div class="actions">
-        <a class="btn btn-teal" href="index.html?role=participant&code=${code}">join_another --room</a>
-        <a class="btn btn-ghost" href="index.html">back_to_home</a>
-      </div>
-    `;
+      content.innerHTML = `
+        <div class="headline">nice work, ${name}</div>
+        <div class="big-score">${score}</div>
+        <div class="sub-score">out of ${total} points · ${pct}% correct</div>
+        <div class="leaderboard">
+          <div class="lb-row gold"><span><span class="rank">#1</span>${name} (you)</span><span class="lb-score">${score} pts</span></div>
+        </div>
+        <div class="actions">
+          <a class="btn btn-teal" href="index.html?role=participant&code=${code}">join_another --room</a>
+          <a class="btn btn-ghost" href="index.html">back_to_home</a>
+        </div>
+      `;
+    }
   }
+
+  render();
 </script>
 </body>
 </html>

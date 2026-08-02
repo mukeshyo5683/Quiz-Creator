@@ -48,6 +48,10 @@
     .sidebar{ display:none; }
     .options-grid{ grid-template-columns: 1fr; }
   }
+  .host-chip img{ width:20px; height:20px; border-radius:50%; }
+  .host-chip span{ font-family: var(--mono); font-size:11.5px; color: var(--muted); }
+  .signout-link{ font-family: var(--mono); font-size:11px; color: var(--muted); background:none; border:none; padding:0; cursor:pointer; border-bottom:1px dashed var(--border); }
+  .signout-link:hover{ color: var(--text); }
 </style>
 </head>
 <body>
@@ -57,6 +61,7 @@
     <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
     <div class="path"><a href="index.html">~/quiz-app</a> / create-quiz.session</div>
     <div class="badge">host mode</div>
+    <div class="host-chip" id="host-chip" style="display:flex; align-items:center; gap:8px; margin-left:10px;"></div>
   </div>
 
   <div class="layout">
@@ -168,7 +173,22 @@
 </div>
 
 <script src="common.js"></script>
-<script>
+<script type="module">
+  import { createRoom, setRoomStatus } from "./assets/rooms.js";
+  import { requireHost, signOutUser } from "./assets/auth.js";
+
+  requireHost((user) => {
+    document.getElementById('host-chip').innerHTML = `
+      <img src="${user.photoURL || ''}" alt="">
+      <span>${user.displayName || user.email}</span>
+      <button class="signout-link" id="signout-btn" type="button">sign out</button>
+    `;
+    document.getElementById('signout-btn').addEventListener('click', async () => {
+      await signOutUser();
+      window.location.href = 'index.html';
+    });
+  });
+
   let questions = [];
   let qSeq = 0;
   let roomCode = '';
@@ -299,17 +319,43 @@
   const pwToggle = document.getElementById('pw-toggle');
   pwToggle.addEventListener('change', () => { document.getElementById('pw-field').style.display = pwToggle.checked ? 'block' : 'none'; });
 
-  document.getElementById('create-room-btn').addEventListener('click', () => {
+  document.getElementById('create-room-btn').addEventListener('click', async () => {
     const requiresPw = pwToggle.checked;
     const pwVal = document.getElementById('room-password').value;
     if(requiresPw && !pwVal){ alert('Set a room password, or turn off the password toggle.'); return; }
+
+    const btn = document.getElementById('create-room-btn');
+    btn.disabled = true;
+    btn.textContent = 'creating...';
+
     roomCode = QuizApp.generateRoomCode();
-    document.getElementById('room-code').textContent = roomCode;
-    document.getElementById('room-link').value = `${window.location.origin}${window.location.pathname.replace('create-quiz.html','index.html')}?role=participant&code=${roomCode}`;
-    document.getElementById('room-result').classList.add('show');
-    log(`<span class="prompt">$</span> quiz create-room <span class="comment">--code ${roomCode}</span>`);
-    log(`<span class="ok">✓</span> room ${roomCode} is live and waiting for participants`);
-    document.getElementById('room-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    try{
+      await createRoom(roomCode, {
+        hostEmail,
+        questions,
+        timerSeconds: Number(document.getElementById('timer').value),
+        shuffle: document.getElementById('shuffle-toggle').checked,
+        allowLateJoin: document.getElementById('late-toggle').checked,
+        anticopy: document.getElementById('anticopy-toggle').checked,
+        maxParticipants: Number(document.getElementById('max-participants').value),
+        passwordRequired: requiresPw,
+        password: requiresPw ? pwVal : ''
+      });
+
+      document.getElementById('room-code').textContent = roomCode;
+      document.getElementById('room-link').value = `${window.location.origin}${window.location.pathname.replace('create-quiz.html','index.html')}?role=participant&code=${roomCode}`;
+      document.getElementById('room-result').classList.add('show');
+      log(`<span class="prompt">$</span> quiz create-room <span class="comment">--code ${roomCode}</span>`);
+      log(`<span class="ok">✓</span> room ${roomCode} saved to the database — waiting for participants`);
+      document.getElementById('room-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }catch(err){
+      console.error(err);
+      log(`<span style="color:var(--red)">✗</span> could not create room — check assets/firebase-config.js`);
+      alert('Could not create the room. Check the browser console and make sure assets/firebase-config.js has your real Firebase project keys.');
+    }finally{
+      btn.disabled = false;
+      btn.textContent = 'create_room --launch';
+    }
   });
 
   document.getElementById('copy-link-btn').addEventListener('click', () => {
@@ -322,23 +368,21 @@
     setTimeout(() => btn.textContent = original, 1200);
   });
 
-  document.getElementById('start-quiz-btn').addEventListener('click', () => {
+  document.getElementById('start-quiz-btn').addEventListener('click', async () => {
     const status = document.getElementById('room-status');
     status.textContent = '✓ starting — opening host monitor...';
     status.className = 'status-line ok';
-    log('<span class="ok">✓</span> quiz started — moving to live monitor');
-
-    const params = {
-      code: roomCode,
-      host: hostEmail,
-      timer: document.getElementById('timer').value,
-      shuffle: document.getElementById('shuffle-toggle').checked ? '1' : '0',
-      late: document.getElementById('late-toggle').checked ? '1' : '0',
-      anticopy: document.getElementById('anticopy-toggle').checked ? '1' : '0',
-      max: document.getElementById('max-participants').value,
-      quiz: QuizApp.encodeQuiz(questions)
-    };
-    setTimeout(() => { window.location.href = QuizApp.buildUrl('host-live.html', params); }, 500);
+    try{
+      // NOTE: we don't flip the room to "live" here — the host monitor page
+      // does that when you click "launch_quiz", so participants only get
+      // moved out of the waiting room once you're actually ready.
+      log('<span class="ok">✓</span> moving to live monitor');
+      window.location.href = QuizApp.buildUrl('host-live.html', { code: roomCode, host: hostEmail });
+    }catch(err){
+      console.error(err);
+      status.textContent = '✗ error opening host monitor';
+      status.className = 'status-line err';
+    }
   });
 </script>
 </body>

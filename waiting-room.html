@@ -45,36 +45,42 @@
 </div>
 
 <script src="common.js"></script>
-<script>
+<script type="module">
+  import { listenRoom, listenParticipants } from "./rooms.js";
+  import { requireParticipant } from "./auth.js";
+
   const name = QuizApp.getParam('name', 'Guest');
   const code = QuizApp.getParam('code', '------');
-  const anticopy = QuizApp.getParam('anticopy', '1');
 
   document.getElementById('you-name').textContent = name;
   document.getElementById('room-code-display').textContent = code;
 
-  const sampleNames = ['Aditi','Rohan','Priya','Karthik','Sneha','Arjun'];
-  const strip = document.getElementById('participant-strip');
-  strip.innerHTML = `<span class="chip you">${name} (you)</span>`;
+  // who "you" are is decided by your signed-in Google uid, not your typed
+  // name — that's what lets two participants share a display name
+  let myUid = null;
+  requireParticipant((user) => { myUid = user.uid; });
 
-  let joined = 0;
-  const joinInterval = setInterval(() => {
-    if(joined >= sampleNames.length){ clearInterval(joinInterval); return; }
-    const chip = document.createElement('span');
-    chip.className = 'chip';
-    chip.textContent = sampleNames[joined];
-    strip.appendChild(chip);
-    joined++;
-  }, 900);
+  // real participant list, updates live as others join
+  listenParticipants(code, (participants) => {
+    const strip = document.getElementById('participant-strip');
+    strip.innerHTML = participants.map(p =>
+      `<span class="chip ${p.uid === myUid ? 'you' : ''}">${p.name}${p.uid === myUid ? ' (you)' : ''}</span>`
+    ).join('');
+  });
 
-  // simulate the host launching the quiz after a short wait, then move to play-quiz.html
-  const waitMs = 5000 + Math.random() * 3000;
-  setTimeout(() => {
-    document.getElementById('wait-text').textContent = 'host started the quiz — joining now';
-    setTimeout(() => {
-      window.location.href = QuizApp.buildUrl('play-quiz.html', { name, code, anticopy });
-    }, 900);
-  }, waitMs);
+  // watch the room itself — the instant the host launches it, jump into the quiz
+  listenRoom(code, (room) => {
+    if(!room){
+      document.getElementById('wait-text').textContent = 'this room no longer exists';
+      return;
+    }
+    if(room.status === 'live'){
+      document.getElementById('wait-text').textContent = 'host started the quiz — joining now';
+      setTimeout(() => {
+        window.location.href = QuizApp.buildUrl('play-quiz.html', { name, code });
+      }, 700);
+    }
+  });
 </script>
 </body>
 </html>

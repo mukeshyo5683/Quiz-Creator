@@ -46,10 +46,10 @@
     <div class="badge teal">room <span id="room-code-badge">------</span></div>
   </div>
 
-  <div class="content">
+  <div class="content" id="content">
     <div class="topbar">
-      <span class="qnum" id="qnum-label">Question 1 of 5</span>
-      <span class="timer" id="timer-label">⏱ 30s</span>
+      <span class="qnum" id="qnum-label">Loading...</span>
+      <span class="timer" id="timer-label"></span>
     </div>
     <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
 
@@ -66,30 +66,49 @@
 </div>
 
 <script src="common.js"></script>
-<script>
+<script type="module">
+  import { getRoom, submitScore } from "./rooms.js";
+  import { requireParticipant } from "./auth.js";
+
   const name = QuizApp.getParam('name', 'Guest');
   const code = QuizApp.getParam('code', '------');
-  const anticopyOn = QuizApp.getParam('anticopy', '1') === '1';
-  const quizDataRaw = QuizApp.getParam('quiz', '');
-  const questions = QuizApp.decodeQuiz(quizDataRaw) || QuizApp.sampleQuiz();
-  const TIMER_SECONDS = Number(QuizApp.getParam('timer', 20));
 
   document.getElementById('player-name').textContent = name;
   document.getElementById('room-code-badge').textContent = code;
 
+  // scores are saved under the signed-in participant's Google uid
+  let myUid = null;
+  requireParticipant((user) => { myUid = user.uid; });
+
   let currentIndex = 0;
   let score = 0;
   let countdownInterval = null;
+  let questions = [];
+  let TIMER_SECONDS = 20;
   const keyLabels = ['A','B','C','D'];
 
-  function log(html){ /* no visible feed on this page, but keeps initAntiCopyLock happy */ console.log(html.replace(/<[^>]+>/g,'')); }
+  function log(msg){ console.log(msg.replace(/<[^>]+>/g,'')); }
   const antiCopy = initAntiCopyLock(log);
-  if(anticopyOn) antiCopy.engage();
+
+  async function init(){
+    const room = await getRoom(code);
+    if(!room || !room.questions || room.questions.length === 0){
+      document.getElementById('content').innerHTML = `
+        <div class="empty-state">Couldn't load this quiz. The room code may be wrong, or the host hasn't created any questions yet.</div>`;
+      return;
+    }
+    questions = room.questions;
+    TIMER_SECONDS = room.timerSeconds || 20;
+    if(room.shuffle) questions = [...questions].sort(() => Math.random() - 0.5);
+
+    if(room.anticopy) antiCopy.engage();
+    renderQuestion();
+  }
 
   function renderQuestion(){
     const q = questions[currentIndex];
     document.getElementById('qnum-label').textContent = `Question ${currentIndex + 1} of ${questions.length}`;
-    document.getElementById('progress-fill').style.width = `${((currentIndex) / questions.length) * 100}%`;
+    document.getElementById('progress-fill').style.width = `${(currentIndex / questions.length) * 100}%`;
     document.getElementById('q-text').textContent = q.text;
 
     const grid = document.getElementById('opt-grid');
@@ -118,7 +137,7 @@
       if(remaining <= 5) timerEl.classList.add('low');
       if(remaining <= 0){
         clearInterval(countdownInterval);
-        lockOptions(-1); // time's up, no selection
+        lockOptions(-1);
       }
     }, 1000);
   }
@@ -149,14 +168,19 @@
     lockOptions(i);
   }
 
-  function finishQuiz(){
-    if(anticopyOn) antiCopy.disengage();
+  async function finishQuiz(){
+    antiCopy.disengage();
+    try{
+      await submitScore(code, myUid, score);
+    }catch(err){
+      console.error('Could not save score:', err);
+    }
     window.location.href = QuizApp.buildUrl('results.html', {
       role: 'participant', code, name, score, total: questions.length * 100
     });
   }
 
-  renderQuestion();
+  init();
 </script>
 </body>
 </html>

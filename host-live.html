@@ -6,7 +6,7 @@
 <title>quiz.host — live monitor</title>
 <link rel="stylesheet" href="style.css">
 <style>
-  .layout{ display:grid; grid-template-columns: 1fr 320px; min-height: 600px; }
+  .layout{ display:grid; grid-template-columns: 1fr 340px; min-height: 560px; }
   .main{ padding: 30px 34px 36px; }
   .side{ background: var(--panel-3); border-left:1px solid var(--border); padding: 26px 22px; display:flex; flex-direction:column; gap:22px; }
 
@@ -14,32 +14,32 @@
   .room-hero .code{ font-family: var(--mono); font-size:34px; letter-spacing:9px; color: var(--teal); }
   .room-hero .label{ font-family: var(--mono); font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; }
 
-  .qbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
-  .qbar .qnum{ font-family: var(--mono); font-size:14px; color: var(--amber); }
-  .progress-track{ height:6px; background: var(--panel-3); border:1px solid var(--border); border-radius:4px; overflow:hidden; margin-bottom:22px; }
-  .progress-fill{ height:100%; background: var(--amber); width:0%; transition: width .3s ease; }
+  .lb-row{ display:flex; align-items:center; justify-content:space-between; font-family: var(--mono); font-size:13.5px; padding:12px 14px; background: var(--panel-3); border:1px solid var(--border); border-radius:7px; margin-bottom:8px; }
+  .lb-row .rank{ color: var(--muted); width: 26px; display:inline-block; }
+  .lb-row.gold{ border-color: var(--amber-dim); }
+  .lb-row.gold .rank{ color: var(--amber); }
+  .lb-row .lb-score{ color: var(--teal); }
+  .lb-row .lb-status{ font-size: 11px; color: var(--muted); }
+  .lb-row .lb-status.done{ color: var(--green); }
 
-  .current-q{ background: var(--panel-3); border:1px solid var(--border); border-radius:8px; padding:20px 22px; margin-bottom:22px; }
-  .current-q h3{ font-family: var(--mono); font-size:15px; margin:0 0 14px; }
-  .opt-list{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
-  .opt-chip{ font-family: var(--mono); font-size:12.5px; padding:9px 12px; border:1px solid var(--border); border-radius:6px; color: var(--muted); }
-  .opt-chip.correct{ border-color: var(--green); color: var(--green); }
-
-  .participant-list{ display:flex; flex-direction:column; gap:8px; overflow-y:auto; max-height: 260px; }
+  .participant-list{ display:flex; flex-direction:column; gap:8px; overflow-y:auto; max-height: 320px; }
   .p-row{ display:flex; align-items:center; justify-content:space-between; font-family: var(--mono); font-size:12.5px; padding:8px 10px; background: var(--panel-2); border:1px solid var(--border); border-radius:6px; }
   .p-row .p-name{ display:flex; align-items:center; gap:8px; }
   .p-row .p-dot{ width:6px; height:6px; border-radius:50%; background: var(--green); flex-shrink:0; }
-  .p-row .p-score{ color: var(--amber); }
-  .p-row .p-flag{ color: var(--red); font-size:11px; }
 
   .side-title{ font-family: var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:8px; justify-content:space-between; }
   .side-title::before{ content:""; width:6px; height:6px; border-radius:50%; background:var(--teal); }
   .count-pill{ font-family: var(--mono); font-size:11px; background: var(--panel-2); border:1px solid var(--border); border-radius: 20px; padding:2px 9px; color: var(--text); }
 
+  .host-chip{ display:flex; align-items:center; gap:8px; margin-left:auto; }
+  .host-chip img{ width:20px; height:20px; border-radius:50%; }
+  .host-chip span{ font-family: var(--mono); font-size:11.5px; color: var(--muted); }
+  .signout-link{ font-family: var(--mono); font-size:11px; color: var(--muted); text-decoration:none; border-bottom:1px dashed var(--border); cursor:pointer; background:none; border-top:none; border-left:none; border-right:none; }
+  .signout-link:hover{ color: var(--text); }
+
   @media (max-width: 900px){
     .layout{ grid-template-columns: 1fr; }
     .side{ border-left:none; border-top:1px solid var(--border); }
-    .opt-list{ grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -50,37 +50,30 @@
     <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
     <div class="path"><a href="index.html">~/quiz-app</a> / host-live.session</div>
     <div class="badge teal" id="phase-badge">lobby</div>
+    <div class="host-chip" id="host-chip"></div>
   </div>
 
   <div class="layout">
     <div class="main">
       <div class="room-hero">
-        <div>
-          <div class="label">room code</div>
-          <div class="code" id="room-code-display">------</div>
-        </div>
-        <div id="lobby-actions">
-          <button class="btn btn-teal" id="launch-btn" type="button">launch_quiz --begin</button>
-        </div>
-        <div id="live-actions" style="display:none; gap:12px;" class="action-row">
-          <button class="btn btn-amber" id="next-btn" type="button">next_question --advance</button>
-          <button class="btn btn-ghost" id="end-btn" type="button">end_quiz --finish</button>
-        </div>
+        <div><div class="label">room code</div><div class="code" id="room-code-display">------</div></div>
+        <div id="lobby-actions"><button class="btn btn-teal" id="launch-btn" type="button">launch_quiz --begin</button></div>
+        <div id="live-actions" style="display:none;"><button class="btn btn-ghost" id="end-btn" type="button">end_quiz --finish</button></div>
       </div>
 
       <div id="lobby-panel" class="panel-card">
         <div class="panel-head">
-          <div><h2><span class="idx">◐</span> Waiting for participants</h2><p>Share the room code above. The quiz begins when you click launch.</p></div>
+          <div><h2><span class="idx">◐</span> Waiting for participants</h2><p>Share the room code above. Everyone who joins appears here in real time.</p></div>
         </div>
         <div class="empty-state" id="lobby-empty">No participants yet — waiting for people to join room <span id="lobby-code-inline"></span>...</div>
       </div>
 
       <div id="live-panel" style="display:none;">
-        <div class="qbar"><span class="qnum" id="qnum-label">Question 1 of 5</span><span class="status-line" id="live-timer" style="margin:0;"></span></div>
-        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
-        <div class="current-q">
-          <h3 id="current-q-text">—</h3>
-          <div class="opt-list" id="current-q-options"></div>
+        <div class="panel-card">
+          <div class="panel-head">
+            <div><h2><span class="idx">◉</span> Live leaderboard</h2><p>Scores update automatically as participants answer and finish.</p></div>
+          </div>
+          <div id="leaderboard"></div>
         </div>
       </div>
     </div>
@@ -89,8 +82,6 @@
       <div class="side-title">participants <span class="count-pill" id="participant-count">0</span></div>
       <div class="participant-list" id="participant-list"></div>
 
-      <div class="lock-banner" id="lock-banner"><span class="dot-pulse"></span><span>Anti-copy lock active — violations: <b id="violation-count">0</b></span></div>
-
       <div class="side-title">activity log</div>
       <div class="feed" id="feed-lines"></div>
     </div>
@@ -98,15 +89,13 @@
 </div>
 
 <script src="common.js"></script>
-<script>
-  const roomCode = QuizApp.getParam('code', QuizApp.generateRoomCode());
-  const timerSec = Number(QuizApp.getParam('timer', 30));
-  const anticopy = QuizApp.getParam('anticopy', '1') === '1';
-  const quizDataRaw = QuizApp.getParam('quiz', '');
-  const questions = QuizApp.decodeQuiz(quizDataRaw) || QuizApp.sampleQuiz();
+<script type="module">
+  import { listenRoom, listenParticipants, setRoomStatus } from "./assets/rooms.js";
+  import { requireHost, signOutUser } from "./assets/auth.js";
 
-  document.getElementById('room-code-display').textContent = roomCode;
-  document.getElementById('lobby-code-inline').textContent = roomCode;
+  const roomCode = QuizApp.getParam('code', '');
+  document.getElementById('room-code-display').textContent = roomCode || '------';
+  document.getElementById('lobby-code-inline').textContent = roomCode || '------';
 
   function log(html){
     const feed = document.getElementById('feed-lines');
@@ -115,126 +104,88 @@
     div.innerHTML = html;
     feed.appendChild(div);
   }
-  log(`<span class="prompt">$</span> host-live --room ${roomCode}`);
-  log(`<span class="comment">// ${questions.length} questions loaded, ${timerSec}s each</span>`);
-  if(anticopy) log('<span class="comment">// anti-copy lock will apply to participants once quiz starts</span>');
 
-  // ---------- simulated lobby: participants trickling in ----------
-  const sampleNames = ['Aditi','Rohan','Priya','Karthik','Sneha','Arjun','Meera','Vikram','Divya','Sanjay'];
-  let participants = [];
-  let joinTimer = null;
-
-  function renderParticipants(){
-    const list = document.getElementById('participant-list');
-    document.getElementById('participant-count').textContent = participants.length;
-    document.getElementById('lobby-empty').style.display = participants.length ? 'none' : 'block';
-    list.innerHTML = participants.map(p => `
-      <div class="p-row">
-        <span class="p-name"><span class="p-dot"></span>${p.name}</span>
-        <span class="p-score">${p.score !== undefined ? p.score + ' pts' : 'joined'}</span>
-      </div>`).join('');
-  }
-
-  function startLobbySimulation(){
-    joinTimer = setInterval(() => {
-      if(participants.length >= sampleNames.length) { clearInterval(joinTimer); return; }
-      const name = sampleNames[participants.length];
-      participants.push({ name, score: undefined });
-      renderParticipants();
-      log(`<span class="ok">✓</span> ${name} joined the room`);
-    }, 1400);
-  }
-  startLobbySimulation();
-
-  // ---------- launch quiz ----------
-  let currentIndex = -1;
-  let countdownInterval = null;
-
-  document.getElementById('launch-btn').addEventListener('click', () => {
-    clearInterval(joinTimer);
-    if(participants.length === 0){
-      participants.push({ name: 'Aditi', score: undefined }, { name: 'Rohan', score: undefined });
-    }
-    participants = participants.map(p => ({ ...p, score: 0 }));
-    renderParticipants();
-
-    document.getElementById('phase-badge').textContent = 'live';
-    document.getElementById('lobby-panel').style.display = 'none';
-    document.getElementById('live-panel').style.display = 'block';
-    document.getElementById('lobby-actions').style.display = 'none';
-    document.getElementById('live-actions').style.display = 'flex';
-
-    log('<span class="ok">✓</span> quiz launched');
-    if(anticopy){ antiCopy.engage(); }
-    nextQuestion();
+  // ---------- auth guard: only a signed-in host can see this page ----------
+  requireHost((user) => {
+    document.getElementById('host-chip').innerHTML = `
+      <img src="${user.photoURL || ''}" alt="">
+      <span>${user.displayName || user.email}</span>
+      <button class="signout-link" id="signout-btn" type="button">sign out</button>
+    `;
+    document.getElementById('signout-btn').addEventListener('click', async () => {
+      await signOutUser();
+      window.location.href = 'index.html';
+    });
   });
 
-  function updateProgress(){
-    const pct = ((currentIndex + 1) / questions.length) * 100;
-    document.getElementById('progress-fill').style.width = pct + '%';
-    document.getElementById('qnum-label').textContent = `Question ${currentIndex + 1} of ${questions.length}`;
-  }
+  if(!roomCode){
+    log('<span style="color:var(--red)">✗</span> no room code in the URL — go back and create a room first');
+  } else {
+    log(`<span class="prompt">$</span> host-live --room ${roomCode}`);
 
-  function renderCurrentQuestion(){
-    const q = questions[currentIndex];
-    document.getElementById('current-q-text').textContent = q.text;
-    document.getElementById('current-q-options').innerHTML = q.options.map((opt, i) => `
-      <div class="opt-chip ${i === Number(q.correct) ? 'correct' : ''}">${opt}${i === Number(q.correct) ? ' ✓' : ''}</div>
-    `).join('');
-  }
+    listenParticipants(roomCode, (participants) => {
+      document.getElementById('participant-count').textContent = participants.length;
+      document.getElementById('lobby-empty').style.display = participants.length ? 'none' : 'block';
 
-  function nextQuestion(){
-    clearInterval(countdownInterval);
-    currentIndex++;
-    if(currentIndex >= questions.length){
-      finishQuiz();
-      return;
+      document.getElementById('participant-list').innerHTML = participants.map(p => `
+        <div class="p-row">
+          <span class="p-name"><span class="p-dot"></span>${p.name}</span>
+          <span>${p.finished ? p.score + ' pts' : 'joined'}</span>
+        </div>`).join('');
+
+      renderLeaderboard(participants);
+    });
+
+    function renderLeaderboard(participants){
+      const board = document.getElementById('leaderboard');
+      if(participants.length === 0){
+        board.innerHTML = '<div class="empty-state">No scores yet.</div>';
+        return;
+      }
+      board.innerHTML = participants.map((p, i) => `
+        <div class="lb-row ${i === 0 ? 'gold' : ''}">
+          <span><span class="rank">#${i+1}</span>${p.name}</span>
+          <span style="display:flex; align-items:center; gap:10px;">
+            <span class="lb-status ${p.finished ? 'done' : ''}">${p.finished ? '✓ finished' : 'in progress'}</span>
+            <span class="lb-score">${p.score} pts</span>
+          </span>
+        </div>`).join('');
     }
-    updateProgress();
-    renderCurrentQuestion();
-    log(`<span class="prompt">$</span> show_question --index ${currentIndex + 1}`);
 
-    let remaining = timerSec;
-    const timerEl = document.getElementById('live-timer');
-    timerEl.textContent = `⏱ ${remaining}s`;
-    countdownInterval = setInterval(() => {
-      remaining--;
-      timerEl.textContent = `⏱ ${Math.max(remaining,0)}s`;
-      // simulate participants scoring while question is live
-      if(remaining === Math.floor(timerSec/2)){
-        participants = participants.map(p => Math.random() > 0.4 ? { ...p, score: p.score + Math.floor(Math.random()*80+20) } : p);
-        renderParticipants();
+    listenRoom(roomCode, (room) => {
+      if(!room) return;
+      if(room.status === 'live' || room.status === 'ended'){
+        document.getElementById('phase-badge').textContent = room.status;
+        document.getElementById('lobby-panel').style.display = 'none';
+        document.getElementById('live-panel').style.display = 'block';
+        document.getElementById('lobby-actions').style.display = 'none';
+        document.getElementById('live-actions').style.display = 'block';
       }
-      if(remaining <= 0){
-        clearInterval(countdownInterval);
-        timerEl.textContent = 'time up';
+    });
+
+    document.getElementById('launch-btn').addEventListener('click', async () => {
+      try{
+        await setRoomStatus(roomCode, 'live');
+        log('<span class="ok">✓</span> quiz launched — participants are being moved into the quiz now');
+      }catch(err){
+        console.error(err);
+        log('<span style="color:var(--red)">✗</span> could not launch — check your Firebase setup');
       }
-    }, 1000);
+    });
+
+    document.getElementById('end-btn').addEventListener('click', async () => {
+      try{
+        await setRoomStatus(roomCode, 'ended');
+        log('<span class="comment">// host ended the quiz</span>');
+        setTimeout(() => {
+          window.location.href = QuizApp.buildUrl('results.html', { role: 'host', code: roomCode });
+        }, 400);
+      }catch(err){
+        console.error(err);
+        log('<span style="color:var(--red)">✗</span> could not end the quiz — check your Firebase setup');
+      }
+    });
   }
-
-  document.getElementById('next-btn').addEventListener('click', nextQuestion);
-
-  function finishQuiz(){
-    log('<span class="ok">✓</span> all questions complete');
-    goToResults();
-  }
-
-  document.getElementById('end-btn').addEventListener('click', () => {
-    clearInterval(countdownInterval);
-    log('<span class="comment">// host ended the quiz early</span>');
-    goToResults();
-  });
-
-  function goToResults(){
-    if(antiCopy) antiCopy.disengage();
-    const leaderboard = [...participants].sort((a,b) => (b.score||0) - (a.score||0))
-      .map(p => `${p.name}:${p.score||0}`).join(',');
-    setTimeout(() => {
-      window.location.href = QuizApp.buildUrl('results.html', { role: 'host', code: roomCode, board: leaderboard });
-    }, 400);
-  }
-
-  const antiCopy = initAntiCopyLock(log);
 </script>
 </body>
 </html>
