@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>quiz.host — live monitor</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .layout{ display:grid; grid-template-columns: 1fr 340px; min-height: 560px; }
+  .main{ padding: 30px 34px 36px; }
+  .side{ background: var(--panel-3); border-left:1px solid var(--border); padding: 26px 22px; display:flex; flex-direction:column; gap:22px; }
+
+  .room-hero{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:22px; }
+  .room-hero .code{ font-family: var(--mono); font-size:34px; letter-spacing:9px; color: var(--teal); }
+  .room-hero .label{ font-family: var(--mono); font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; }
+
+  .lb-row{ display:flex; align-items:center; justify-content:space-between; font-family: var(--mono); font-size:13.5px; padding:12px 14px; background: var(--panel-3); border:1px solid var(--border); border-radius:7px; margin-bottom:8px; }
+  .lb-row .rank{ color: var(--muted); width: 26px; display:inline-block; }
+  .lb-row.gold{ border-color: var(--amber-dim); }
+  .lb-row.gold .rank{ color: var(--amber); }
+  .lb-row .lb-score{ color: var(--teal); }
+  .lb-row .lb-status{ font-size: 11px; color: var(--muted); }
+  .lb-row .lb-status.done{ color: var(--green); }
+
+  .participant-list{ display:flex; flex-direction:column; gap:8px; overflow-y:auto; max-height: 320px; }
+  .p-row{ display:flex; align-items:center; justify-content:space-between; font-family: var(--mono); font-size:12.5px; padding:8px 10px; background: var(--panel-2); border:1px solid var(--border); border-radius:6px; }
+  .p-row .p-name{ display:flex; align-items:center; gap:8px; }
+  .p-row .p-dot{ width:6px; height:6px; border-radius:50%; background: var(--green); flex-shrink:0; }
+
+  .side-title{ font-family: var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:8px; justify-content:space-between; }
+  .side-title::before{ content:""; width:6px; height:6px; border-radius:50%; background:var(--teal); }
+  .count-pill{ font-family: var(--mono); font-size:11px; background: var(--panel-2); border:1px solid var(--border); border-radius: 20px; padding:2px 9px; color: var(--text); }
+
+  .host-chip{ display:flex; align-items:center; gap:8px; margin-left:auto; }
+  .host-chip img{ width:20px; height:20px; border-radius:50%; }
+  .host-chip span{ font-family: var(--mono); font-size:11.5px; color: var(--muted); }
+  .signout-link{ font-family: var(--mono); font-size:11px; color: var(--muted); text-decoration:none; border-bottom:1px dashed var(--border); cursor:pointer; background:none; border-top:none; border-left:none; border-right:none; }
+  .signout-link:hover{ color: var(--text); }
+
+  @media (max-width: 900px){
+    .layout{ grid-template-columns: 1fr; }
+    .side{ border-left:none; border-top:1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<div class="window">
+  <div class="titlebar">
+    <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+    <div class="path"><a href="index.html">~/quiz-app</a> / host-live.session</div>
+    <div class="badge teal" id="phase-badge">lobby</div>
+    <div class="host-chip" id="host-chip"></div>
+  </div>
+
+  <div class="layout">
+    <div class="main">
+      <div class="room-hero">
+        <div><div class="label">room code</div><div class="code" id="room-code-display">------</div></div>
+        <div id="lobby-actions"><button class="btn btn-teal" id="launch-btn" type="button">launch_quiz --begin</button></div>
+        <div id="live-actions" style="display:none;"><button class="btn btn-ghost" id="end-btn" type="button">end_quiz --finish</button></div>
+      </div>
+
+      <div id="lobby-panel" class="panel-card">
+        <div class="panel-head">
+          <div><h2><span class="idx">◐</span> Waiting for participants</h2><p>Share the room code above. Everyone who joins appears here in real time.</p></div>
+        </div>
+        <div class="empty-state" id="lobby-empty">No participants yet — waiting for people to join room <span id="lobby-code-inline"></span>...</div>
+      </div>
+
+      <div id="live-panel" style="display:none;">
+        <div class="panel-card">
+          <div class="panel-head">
+            <div><h2><span class="idx">◉</span> Live leaderboard</h2><p>Scores update automatically as participants answer and finish.</p></div>
+          </div>
+          <div id="leaderboard"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="side-title">participants <span class="count-pill" id="participant-count">0</span></div>
+      <div class="participant-list" id="participant-list"></div>
+
+      <div class="side-title">activity log</div>
+      <div class="feed" id="feed-lines"></div>
+    </div>
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script type="module">
+  import { listenRoom, listenParticipants, setRoomStatus } from "./assets/rooms.js";
+  import { requireHost, signOutUser } from "./assets/auth.js";
+
+  const roomCode = QuizApp.getParam('code', '');
+  document.getElementById('room-code-display').textContent = roomCode || '------';
+  document.getElementById('lobby-code-inline').textContent = roomCode || '------';
+
+  function log(html){
+    const feed = document.getElementById('feed-lines');
+    const div = document.createElement('div');
+    div.className = 'feed-line';
+    div.innerHTML = html;
+    feed.appendChild(div);
+  }
+
+  // ---------- auth guard: only a signed-in host can see this page ----------
+  requireHost((user) => {
+    document.getElementById('host-chip').innerHTML = `
+      <img src="${user.photoURL || ''}" alt="">
+      <span>${user.displayName || user.email}</span>
+      <button class="signout-link" id="signout-btn" type="button">sign out</button>
+    `;
+    document.getElementById('signout-btn').addEventListener('click', async () => {
+      await signOutUser();
+      window.location.href = 'index.html';
+    });
+  });
+
+  if(!roomCode){
+    log('<span style="color:var(--red)">✗</span> no room code in the URL — go back and create a room first');
+  } else {
+    log(`<span class="prompt">$</span> host-live --room ${roomCode}`);
+
+    listenParticipants(roomCode, (participants) => {
+      document.getElementById('participant-count').textContent = participants.length;
+      document.getElementById('lobby-empty').style.display = participants.length ? 'none' : 'block';
+
+      document.getElementById('participant-list').innerHTML = participants.map(p => `
+        <div class="p-row">
+          <span class="p-name"><span class="p-dot"></span>${p.name}</span>
+          <span>${p.finished ? p.score + ' pts' : 'joined'}</span>
+        </div>`).join('');
+
+      renderLeaderboard(participants);
+    });
+
+    function renderLeaderboard(participants){
+      const board = document.getElementById('leaderboard');
+      if(participants.length === 0){
+        board.innerHTML = '<div class="empty-state">No scores yet.</div>';
+        return;
+      }
+      board.innerHTML = participants.map((p, i) => `
+        <div class="lb-row ${i === 0 ? 'gold' : ''}">
+          <span><span class="rank">#${i+1}</span>${p.name}</span>
+          <span style="display:flex; align-items:center; gap:10px;">
+            <span class="lb-status ${p.finished ? 'done' : ''}">${p.finished ? '✓ finished' : 'in progress'}</span>
+            <span class="lb-score">${p.score} pts</span>
+          </span>
+        </div>`).join('');
+    }
+
+    listenRoom(roomCode, (room) => {
+      if(!room) return;
+      if(room.status === 'live' || room.status === 'ended'){
+        document.getElementById('phase-badge').textContent = room.status;
+        document.getElementById('lobby-panel').style.display = 'none';
+        document.getElementById('live-panel').style.display = 'block';
+        document.getElementById('lobby-actions').style.display = 'none';
+        document.getElementById('live-actions').style.display = 'block';
+      }
+    });
+
+    document.getElementById('launch-btn').addEventListener('click', async () => {
+      try{
+        await setRoomStatus(roomCode, 'live');
+        log('<span class="ok">✓</span> quiz launched — participants are being moved into the quiz now');
+      }catch(err){
+        console.error(err);
+        log('<span style="color:var(--red)">✗</span> could not launch — check your Firebase setup');
+      }
+    });
+
+    document.getElementById('end-btn').addEventListener('click', async () => {
+      try{
+        await setRoomStatus(roomCode, 'ended');
+        log('<span class="comment">// host ended the quiz</span>');
+        setTimeout(() => {
+          window.location.href = QuizApp.buildUrl('results.html', { role: 'host', code: roomCode });
+        }, 400);
+      }catch(err){
+        console.error(err);
+        log('<span style="color:var(--red)">✗</span> could not end the quiz — check your Firebase setup');
+      }
+    });
+  }
+</script>
+</body>
+</html>
