@@ -178,6 +178,7 @@
   import { requireHost, signOutUser } from "./assets/auth.js";
 
   requireHost((user) => {
+    hostEmail = user.email; // authoritative value — always matches request.auth.token.email
     document.getElementById('host-chip').innerHTML = `
       <img src="${user.photoURL || ''}" alt="">
       <span>${user.displayName || user.email}</span>
@@ -211,7 +212,7 @@
     div.innerHTML = html;
     feed.appendChild(div);
   }
-  const hostEmail = QuizApp.getParam('host', 'host');
+  let hostEmail = QuizApp.getParam('host', 'host'); // fallback shown briefly until auth confirms
   log(`<span class="prompt">$</span> quiz create <span class="comment">--host ${hostEmail}</span>`);
   log('<span class="comment">// waiting for quiz details...</span>');
 
