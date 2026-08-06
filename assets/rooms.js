@@ -16,17 +16,36 @@
 
 import {
   db, doc, setDoc, getDoc, getDocs, updateDoc, onSnapshot,
-  collection, query, orderBy, serverTimestamp
+  collection, query, orderBy, serverTimestamp, writeBatch
 } from "./firebase.js";
 
 // ---- rooms ----
 
 export async function createRoom(code, data){
-  await setDoc(doc(db, "rooms", code), {
+  // Make a copy of each question, but without the "correct" field —
+  // this is what participants will be allowed to see.
+  const publicQuestions = data.questions.map(q => {
+    const { correct, ...rest } = q;
+    return rest;
+  });
+
+  // Pull out just the correct answers, in order — this stays hidden.
+  const answerKey = data.questions.map(q => q.correct);
+
+  const batch = writeBatch(db);
+
+  batch.set(doc(db, "rooms", code), {
     ...data,
+    questions: publicQuestions,
     status: "lobby",
     createdAt: serverTimestamp()
   });
+
+  batch.set(doc(db, "rooms", code, "answerKey", "data"), {
+    correct: answerKey
+  });
+
+  await batch.commit();
 }
 
 export async function getRoom(code){
