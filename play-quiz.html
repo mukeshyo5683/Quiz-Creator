@@ -63,6 +63,14 @@
 
     <div class="lock-banner" id="lock-banner"><span class="dot-pulse"></span><span>Full-screen lock active — violations: <b id="violation-count">0</b></span></div>
   </div>
+
+  <div class="content" id="start-gate" style="display:none;">
+    <div class="empty-state" style="text-align:center; padding: 40px 24px;">
+      <p style="font-family: var(--mono); color: var(--text); font-size:14px; margin: 0 0 10px;">🔒 full-screen anti-copy mode</p>
+      <p style="margin: 0 0 22px;">Browsers only allow full-screen after a click — press start to enter full-screen and begin. Exiting full-screen, switching tabs, or using copy/dev-tools shortcuts will be logged as a violation.</p>
+      <button class="btn btn-teal" id="start-anticopy-btn" type="button">start_quiz --fullscreen</button>
+    </div>
+  </div>
 </div>
 
 <script src="assets/common.js"></script>
@@ -101,7 +109,22 @@
     TIMER_SECONDS = room.timerSeconds || 20;
     if(room.shuffle) questions = [...questions].sort(() => Math.random() - 0.5);
 
-    if(room.anticopy) antiCopy.engage();
+    if(room.anticopy){
+      // Browsers only grant full-screen from inside a direct click handler —
+      // requesting it automatically here (no click) gets silently refused or
+      // dropped almost immediately, which used to show up as a phantom
+      // "exited full-screen" violation the player never actually caused.
+      // So: pause on a start screen and only call engage() from a real click.
+      document.getElementById('content').style.display = 'none';
+      document.getElementById('start-gate').style.display = 'block';
+      document.getElementById('start-anticopy-btn').addEventListener('click', () => {
+        document.getElementById('start-gate').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+        antiCopy.engage();
+        renderQuestion();
+      }, { once: true });
+      return;
+    }
     renderQuestion();
   }
 
